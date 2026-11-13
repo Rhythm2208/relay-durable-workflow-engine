@@ -1,0 +1,6 @@
+CREATE TABLE inventory_items (sku VARCHAR(80) PRIMARY KEY, product_name VARCHAR(160) NOT NULL, available INT NOT NULL CHECK (available >= 0));
+INSERT INTO inventory_items(sku,product_name,available) VALUES ('LAPTOP-14','14-inch Laptop',80),('HEADPHONES','Wireless Headphones',150),('KEYBOARD','Mechanical Keyboard',100) ON CONFLICT (sku) DO NOTHING;
+CREATE TABLE inventory_reservations (workflow_id UUID PRIMARY KEY REFERENCES workflows(id), order_id VARCHAR(100) NOT NULL, sku VARCHAR(80) NOT NULL REFERENCES inventory_items(sku), quantity INT NOT NULL CHECK (quantity > 0), status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE', created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE payments (workflow_id UUID PRIMARY KEY REFERENCES workflows(id), order_id VARCHAR(100) NOT NULL, amount NUMERIC(12,2) NOT NULL, status VARCHAR(24) NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE shipments (workflow_id UUID PRIMARY KEY REFERENCES workflows(id), order_id VARCHAR(100) NOT NULL, tracking_code VARCHAR(120) UNIQUE NOT NULL, status VARCHAR(24) NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE customer_notifications (workflow_id UUID PRIMARY KEY REFERENCES workflows(id), order_id VARCHAR(100) NOT NULL, recipient VARCHAR(320) NOT NULL, message VARCHAR(500) NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now());

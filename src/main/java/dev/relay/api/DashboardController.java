@@ -1,0 +1,9 @@
+package dev.relay.api;
+import dev.relay.domain.*;import org.springframework.stereotype.Controller;import org.springframework.ui.Model;import org.springframework.web.bind.annotation.*;import java.util.UUID;
+@Controller public class DashboardController {
+ private final dev.relay.repo.WorkflowRepository repo;private final OrderFulfillmentService orders;private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+ public DashboardController(dev.relay.repo.WorkflowRepository repo,OrderFulfillmentService orders,org.springframework.jdbc.core.JdbcTemplate jdbc){this.repo=repo;this.orders=orders;this.jdbc=jdbc;}
+ @GetMapping("/") public String home(Model m){m.addAttribute("orders",orders.dashboardOrders());m.addAttribute("metrics",orders.metrics());m.addAttribute("catalog",jdbc.queryForList("select sku,product_name,available from inventory_items order by product_name"));m.addAttribute("scenarios",CreateOrderRequest.PaymentScenario.values());return "index";}
+ @PostMapping("/orders") public String create(@ModelAttribute CreateOrderRequest request,Model m){try{var w=orders.create(request);return "redirect:/workflows/"+w.id();}catch(Exception e){m.addAttribute("orders",orders.dashboardOrders());m.addAttribute("metrics",orders.metrics());m.addAttribute("formError",e.getMessage());m.addAttribute("catalog",jdbc.queryForList("select sku,product_name,available from inventory_items order by product_name"));m.addAttribute("scenarios",CreateOrderRequest.PaymentScenario.values());return "index";}}
+ @GetMapping("/workflows/{id}") public String detail(@PathVariable UUID id,Model m){var w=repo.get(id).orElseThrow();m.addAttribute("workflow",w);m.addAttribute("history",repo.history(id));m.addAttribute("steps",repo.steps(id));if(w.workflowType().equals("order-fulfillment"))m.addAttribute("order",orders.dashboardOrders().stream().filter(o->o.workflow().id().equals(id)).findFirst().orElse(null));return "detail";}
+}

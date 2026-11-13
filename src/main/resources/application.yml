@@ -1,0 +1,21 @@
+server:
+  port: ${SERVER_PORT:8082}
+spring:
+  application:
+    name: relay
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5434/relay}
+    username: ${SPRING_DATASOURCE_USERNAME:relay}
+    password: ${SPRING_DATASOURCE_PASSWORD:relay}
+  flyway:
+    enabled: true
+  thymeleaf:
+    cache: false
+relay:
+  workers: ${RELAY_WORKERS:4}
+  poll-ms: ${RELAY_POLL_MS:500}
+  lease-seconds: ${RELAY_LEASE_SECONDS:30}
+  retry-base-seconds: ${RELAY_RETRY_BASE_SECONDS:2}
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

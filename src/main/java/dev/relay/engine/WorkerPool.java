@@ -1,0 +1,12 @@
+package dev.relay.engine;
+import dev.relay.repo.WorkflowRepository; import dev.relay.repo.WorkflowRepository.Claim; import org.springframework.beans.factory.annotation.Value; import org.springframework.scheduling.annotation.Scheduled;import java.util.concurrent.Executor;import java.util.concurrent.atomic.AtomicInteger; import org.springframework.stereotype.Component;import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty; import java.net.InetAddress; import java.util.UUID;
+@Component
+@ConditionalOnProperty(name="relay.workers.enabled",havingValue="true",matchIfMissing=true)
+public class WorkerPool {
+ private final WorkflowRepository repo;private final ActivityRunner runner;private final Executor executor;private final AtomicInteger active=new AtomicInteger();private final String worker=host()+"-"+UUID.randomUUID();
+ @Value("${relay.lease-seconds:30}") int lease;@Value("${relay.workers:4}") int workers;@Value("${relay.retry-base-seconds:2}") int base;
+ public WorkerPool(WorkflowRepository r,ActivityRunner a,@org.springframework.beans.factory.annotation.Qualifier("relayWorkerExecutor") Executor executor){repo=r;runner=a;this.executor=executor;}
+ @Scheduled(fixedDelayString="${relay.poll-ms:500}") public void poll(){while(active.get()<workers){active.incrementAndGet();var c=repo.claim(worker,lease);if(c.isEmpty()){active.decrementAndGet();return;}try{executor.execute(()->{try{execute(c.get());}finally{active.decrementAndGet();}});}catch(RuntimeException rejected){active.decrementAndGet();return;}}}
+ private void execute(Claim c){if(c.step()<0){repo.finishNoSteps(c);return;}repo.record(c.id(),"STEP_STARTED",c.step(),c.attempt(),worker,c.token(),java.util.Map.of("activity",c.activity()));try{runner.run(c.id(),c.activity(),c.config(),c.input(),c.attempt());repo.advance(c,true,null,false,0);}catch(Exception e){boolean terminal=c.attempt()>=c.maxAttempts();int wait=(int)Math.min(3600,base*Math.pow(2,Math.max(0,c.attempt()-1)));repo.advance(c,false,e.getMessage(),terminal,wait);if(terminal&&"order-fulfillment".equals(c.workflowType()))try{if(runner.compensate(c.id()))repo.record(c.id(),"COMPENSATION_COMPLETED",c.step(),c.attempt(),worker,c.token(),java.util.Map.of("action","inventory released after failed payment"));}catch(Exception ignored){}}}
+ private static String host(){try{return InetAddress.getLocalHost().getHostName();}catch(Exception e){return "relay-worker";}}
+}
